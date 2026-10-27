@@ -1,0 +1,47 @@
+{
+  "name": "drafting-agent",
+  "description": "Writes the customer reply in the customer's preferred style, grounded in the KB and customer memory.",
+  "definition": {
+    "kind": "prompt",
+    "rai_config": {
+      "rai_policy_name": "${RAI_POLICY_ID}"
+    },
+    "model": "${CHAT_MODEL_DEPLOYMENT}",
+    "reasoning": {
+      "effort": "low"
+    },
+    "tools": [
+      {
+        "type": "mcp",
+        "server_label": "ticket-system",
+        "server_url": "${TICKET_SYSTEM_MCP_URL}",
+        "allowed_tools": {
+          "tool_names": [
+            "get_ticket"
+          ]
+        },
+        "require_approval": "never",
+        "project_connection_id": "ticket-system"
+      },
+      {
+        "type": "mcp",
+        "server_label": "support-kb",
+        "server_url": "${KNOWLEDGE_BASE_MCP_URL}",
+        "require_approval": "never",
+        "project_connection_id": "support-kb"
+      },
+      {
+        "type": "memory_search_preview",
+        "memory_store_name": "customer-memory",
+        "scope": "contoso-support-customers",
+        "update_delay": 30
+      }
+    ],
+    "tool_choice": "auto",
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    }
+  }
+}

@@ -1,0 +1,88 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+# One command deploys the whole sample:   azd up
+#   1. provision  infra/*.bicep        Foundry account + project, models, guardrail, AI Search, Storage, Functions, App Insights, RBAC
+#   2. deploy     ticket-system        the mock ticket system (Azure Functions) that exposes MCP tools and the support console
+#                 case-manager         the hosted Case Manager agent (Agent Framework workflow, built remotely by Foundry)
+#   3. postdeploy scripts/setup.py     Foundry IQ knowledge base, customer memory, toolbox, the five prompt agents,
+#                                      routines, agent identity access, and demo data
+
+name: foundry-support-agent
+metadata:
+  template: foundry-support-agent@1.0.0
+
+requiredVersions:
+  azd: '>=1.37.0'
+  extensions:
+    azure.ai.agents: '>=1.0.0-beta.21'
+    azure.ai.projects: '>=1.0.0-beta.14'
+
+infra:
+  provider: bicep
+  path: infra
+
+services:
+  ticket-system:
+    project: src/ticket-system
+    language: python
+    host: function
+    hooks:
+      prepackage:
+        # The ticket system serves the KB articles as web pages so citations in drafts are clickable.
+        posix:
+          shell: sh
+          run: rm -rf kb && cp -r ../../knowledge-base kb
+        windows:
+          shell: pwsh
+          run: Remove-Item kb -Recurse -Force -ErrorAction SilentlyContinue; Copy-Item ../../knowledge-base kb -Recurse
+
+  # The Foundry project itself (and its model deployments) is created by infra/*.bicep.
+  ai-project:
+    host: azure.ai.project
+
+  case-manager:
+    project: src/case-manager
+    host: azure.ai.agent
+    language: python
+    uses:
+      - ai-project
+    kind: hosted
+    name: case-manager
+    description: Case Manager - runs the triage, diagnostics, and drafting agents, then waits for a support engineer to approve before anything is sent.
+    codeConfiguration:
+      dependencyResolution: remote_build
+      entryPoint: main.py
+      runtime: python_3_13
+    container:
+      resources:
+        cpu: "0.5"
+        memory: 1Gi
+    protocols:
+      - protocol: responses
+        version: 2.0.0
+    environmentVariables:
+      - name: TOOLBOX_ENDPOINT
+        value: ${TOOLBOX_ENDPOINT}
+      - name: KB_BASE_URL
+        value: ${KB_BASE_URL}
+      # Optional version pins for the prompt agents. Empty means "use the latest version".
+      # Pin them in production: azd env set DRAFTING_AGENT_VERSION 3 && azd deploy case-manager
+      - name: TRIAGE_AGENT_VERSION
+        value: ${TRIAGE_AGENT_VERSION}
+      - name: DIAGNOSTICS_AGENT_VERSION
+        value: ${DIAGNOSTICS_AGENT_VERSION}
+      - name: DRAFTING_AGENT_VERSION
+        value: ${DRAFTING_AGENT_VERSION}
+      - name: KNOWLEDGE_AGENT_VERSION
+        value: ${KNOWLEDGE_AGENT_VERSION}
+
+hooks:
+  postdeploy:
+    posix:
+      shell: sh
+      run: ./scripts/postdeploy.sh
+      interactive: true
+    windows:
+      shell: pwsh
+      run: ./scripts/postdeploy.ps1
+      interactive: true

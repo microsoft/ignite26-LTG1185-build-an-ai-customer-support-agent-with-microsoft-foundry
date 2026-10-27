@@ -1,0 +1,37 @@
+{
+  "name": "followup-agent",
+  "description": "Daily check of open tickets that are waiting on the customer or overdue for an update.",
+  "definition": {
+    "kind": "prompt",
+    "rai_config": {
+      "rai_policy_name": "${RAI_POLICY_ID}"
+    },
+    "model": "${CHAT_MODEL_DEPLOYMENT}",
+    "reasoning": {
+      "effort": "low"
+    },
+    "tools": [
+      {
+        "type": "mcp",
+        "server_label": "ticket-system",
+        "server_url": "${TICKET_SYSTEM_MCP_URL}",
+        "allowed_tools": {
+          "tool_names": [
+            "list_open_tickets",
+            "get_ticket",
+            "add_ticket_note"
+          ]
+        },
+        "require_approval": "never",
+        "project_connection_id": "ticket-system"
+      },
+      {
+        "type": "mcp",
+        "server_label": "support-kb",
+        "server_url": "${KNOWLEDGE_BASE_MCP_URL}",
+        "require_approval": "never",
+        "project_connection_id": "support-kb"
+      }
+    ]
+  }
+}

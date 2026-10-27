@@ -1,0 +1,5 @@
+# The Python worker is managed by Azure Functions; don't add azure-functions-worker here.
+azure-functions>=1.24.0
+azure-data-tables>=12.5.0
+azure-identity>=1.17.0
+markdown>=3.6

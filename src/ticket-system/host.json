@@ -1,0 +1,25 @@
+{
+  "version": "2.0",
+  "extensions": {
+    "mcp": {
+      "serverName": "ContosoSupportTickets",
+      "serverVersion": "1.0.0",
+      "instructions": "Mock ticketing system for the OrderSync support demo. Use get_ticket first. Internal notes are private; send_customer_update is customer-facing and requires human approval.",
+      "system": {
+        "webhookAuthorizationLevel": "System"
+      }
+    }
+  },
+  "logging": {
+    "applicationInsights": {
+      "samplingSettings": {
+        "isEnabled": true,
+        "excludedTypes": "Request"
+      }
+    }
+  },
+  "extensionBundle": {
+    "id": "Microsoft.Azure.Functions.ExtensionBundle",
+    "version": "[4.0.0, 5.0.0)"
+  }
+}

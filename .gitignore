@@ -427,3 +427,11 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Sample-specific
+.venv/
+.azure/
+.pytest_cache/
+local.settings.json
+
+src/ticket-system/kb/

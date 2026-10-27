@@ -1,0 +1,36 @@
+{
+  "name": "knowledge-agent",
+  "description": "When no KB article matches, drafts a new one from the diagnostics so the gap gets closed.",
+  "definition": {
+    "kind": "prompt",
+    "rai_config": {
+      "rai_policy_name": "${RAI_POLICY_ID}"
+    },
+    "model": "${CHAT_MODEL_DEPLOYMENT}",
+    "reasoning": {
+      "effort": "low"
+    },
+    "tools": [
+      {
+        "type": "mcp",
+        "server_label": "ticket-system",
+        "server_url": "${TICKET_SYSTEM_MCP_URL}",
+        "allowed_tools": {
+          "tool_names": [
+            "get_ticket",
+            "get_log_stats"
+          ]
+        },
+        "require_approval": "never",
+        "project_connection_id": "ticket-system"
+      },
+      {
+        "type": "mcp",
+        "server_label": "support-kb",
+        "server_url": "${KNOWLEDGE_BASE_MCP_URL}",
+        "require_approval": "never",
+        "project_connection_id": "support-kb"
+      }
+    ]
+  }
+}

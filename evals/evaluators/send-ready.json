@@ -1,0 +1,19 @@
+{
+  "name": "send-ready",
+  "display_name": "Would you send this?",
+  "description": "Checks a drafted customer email against the expected behavior for that ticket.",
+  "categories": ["quality", "agents"],
+  "definition": {
+    "type": "prompt",
+    "init_parameters": {
+      "type": "object",
+      "required": ["deployment_name"],
+      "properties": {"deployment_name": {"type": "string"}}
+    },
+    "data_schema": {"type": "object", "required": [], "properties": {}},
+    "metrics": {
+      "send-ready": {"type": "boolean", "desirable_direction": "increase"}
+    },
+    "prompt_text": "###\nYou are a support team lead deciding whether a drafted customer email is safe to send.\nThe response contains the customer email followed by internal sections for the approving engineer (such as \"Why this draft\" or \"Status\"). Judge ONLY the customer email. Ignore the internal sections completely; KB numbers and notes there are allowed.\nPass (true) only if the customer email meets every point in the expectations and contains no invented fixes, refunds, credits, guarantees, links, internal details, or other customers' data. Otherwise fail (false).\nThese are expected and must not cause a fail:\n- A next-update time (required by policy).\n- A signature placeholder for the sending engineer, such as \"[Engineer name]\".\n- The fixes named in the expectations, plus closely related optional steps; they come from the verified knowledge base.\nIn the reason, name the first point it missed in one or two sentences.\n---\n### Input:\nQuery:\n{{query}}\nResponse:\n{{response}}\nExpectations:\n{{ground_truth}}\n---\n### Output Format (JSON):\n{\n    \"result\": <boolean>,\n    \"reason\": \"<brief explanation for the result>\"\n}"
+  }
+}

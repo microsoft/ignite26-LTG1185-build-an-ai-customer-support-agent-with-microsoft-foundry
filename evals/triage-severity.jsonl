@@ -1,0 +1,8 @@
+{"query": "Triage ticket EVAL-01", "ground_truth": "Sev1"}
+{"query": "Triage ticket EVAL-02", "ground_truth": "Sev1"}
+{"query": "Triage ticket EVAL-03", "ground_truth": "Sev2"}
+{"query": "Triage ticket EVAL-04", "ground_truth": "Sev2"}
+{"query": "Triage ticket EVAL-05", "ground_truth": "Sev3"}
+{"query": "Triage ticket EVAL-06", "ground_truth": "Sev3"}
+{"query": "Triage ticket EVAL-07", "ground_truth": "Sev4"}
+{"query": "Triage ticket EVAL-08", "ground_truth": "Sev4"}

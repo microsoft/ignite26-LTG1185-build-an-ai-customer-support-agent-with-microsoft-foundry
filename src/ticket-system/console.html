@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Contoso OrderSync Support Center</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* Sized for a 1920x1080 projector: 20px base text, high contrast. */
+  :root {
+    --brand:#0b2a5b; --blue:#0f6cbd; --bg:#eef1f6; --card:#fff; --line:#d6dbe4; --text:#16191f; --muted:#5a6270;
+    --green:#0e7a0d; --green-bg:#e7f6e7; --amber:#a35b00; --amber-bg:#fff5db; --amber-line:#f0b429;
+    --red:#b3261e; --red-bg:#fdecea; --purple:#5b2fa0; --purple-bg:#f2ecfc;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); font-size:20px; line-height:1.45; }
+  button { font:inherit; border-radius:8px; border:1px solid var(--line); background:#fff; padding:10px 20px; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  button.primary { background:var(--blue); color:#fff; border-color:var(--blue); font-weight:600; }
+  button.approve { background:var(--green); color:#fff; border-color:var(--green); font-weight:600; padding:14px 32px; font-size:22px; }
+  button.deny { color:var(--red); border-color:var(--red); padding:14px 28px; font-size:22px; }
+  button.alt { color:var(--brand); border-color:var(--brand); padding:14px 28px; font-size:22px; }
+  .approval textarea { width:100%; box-sizing:border-box; font:inherit; font-size:21px; line-height:1.45; border:2px solid var(--amber-line);
+    border-radius:10px; padding:18px 24px; margin:16px 0 20px; resize:vertical; background:#fff; }
+  .approval .edited { display:inline-block; margin-left:12px; font-size:16px; font-weight:600; color:var(--brand); }
+  .revising { background:#eef4ff; border:2px solid #b7cdf5; }
+  .revising h2 { margin:0 0 8px; font-size:26px; display:flex; align-items:center; gap:12px; }
+
+  header { height:72px; background:var(--brand); color:#fff; display:flex; align-items:center; gap:20px; padding:0 28px; }
+  header .logo { width:40px; height:40px; border-radius:10px; background:linear-gradient(135deg,#50e6ff,#0f6cbd); display:grid; place-items:center; font-weight:700; font-size:22px; }
+  header .name { font-size:24px; font-weight:600; }
+  header .name span { font-weight:400; opacity:.75; }
+  header .spacer { flex:1; }
+  header .who { font-size:17px; opacity:.85; }
+  header .dot { width:10px; height:10px; border-radius:50%; background:#5fd08a; display:inline-block; margin-right:6px; }
+  header .dot.off { background:#ff9f3d; }
+  header button { background:#fff; color:var(--brand); border:none; font-weight:600; }
+  header .toggle { background:transparent; color:#fff; border:1px solid rgba(255,255,255,.4); padding:8px 14px; }
+
+  .layout { display:grid; grid-template-columns:400px 1fr; height:calc(100vh - 72px); }
+  .layout.collapsed { grid-template-columns:1fr; }
+  .layout.collapsed .list { display:none; }
+  .list { background:#fff; border-right:1px solid var(--line); overflow:auto; }
+  .list h2 { font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:18px 20px 8px; }
+  .row { padding:14px 20px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .row:hover { background:#f3f7fc; }
+  .row.sel { background:#e6f0fb; box-shadow:inset 5px 0 0 var(--blue); }
+  .row .top { display:flex; justify-content:space-between; font-size:17px; color:var(--muted); }
+  .row .top b { color:var(--text); }
+  .row .title { margin:4px 0 8px; font-weight:600; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .row .chips { display:flex; gap:6px; flex-wrap:wrap; }
+
+  .chip { display:inline-flex; align-items:center; gap:6px; padding:2px 12px; border-radius:999px; font-size:16px; font-weight:600; background:#eceff4; color:#3d4450; white-space:nowrap; }
+  .chip.big { font-size:19px; padding:4px 16px; }
+  .s-New { background:#e3effb; color:#0f548c; }
+  .s-Awaiting-customer { background:var(--green-bg); color:var(--green); }
+  .s-Escalated { background:var(--red-bg); color:var(--red); }
+  .s-Resolved, .s-Closed { color:var(--muted); }
+  .sev-Sev1 { background:var(--red); color:#fff; } .sev-Sev2 { background:#d9480f; color:#fff; }
+  .sev-Sev3 { background:#f0b429; color:#3a2a00; } .sev-Sev4 { background:#8a94a6; color:#fff; }
+  .c-approval { background:var(--amber-bg); color:var(--amber); border:1px solid var(--amber-line); }
+  .c-working { background:var(--purple-bg); color:var(--purple); }
+  .c-failed { background:var(--red-bg); color:var(--red); border:1px solid #f1a9a4; }
+  .spin { width:16px; height:16px; border:3px solid currentColor; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite; display:inline-block; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .detail { overflow:auto; padding:28px 40px 60px; }
+  .wrap { max-width:1360px; margin:0 auto; }
+  .empty { color:var(--muted); margin-top:140px; text-align:center; font-size:24px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:24px 30px; margin-bottom:20px; }
+
+  .tk .crumb { color:var(--muted); font-size:18px; }
+  .tk .crumb b { color:var(--text); }
+  .tk h1 { font-size:32px; margin:4px 0 12px; line-height:1.2; display:flex; gap:16px; align-items:flex-start; }
+  .tk h1 span { flex:1; }
+  .tk .chips { display:flex; gap:10px; flex-wrap:wrap; }
+  .tk .facts { display:flex; gap:36px; margin-top:14px; color:var(--muted); font-size:18px; flex-wrap:wrap; }
+  .tk .facts b { color:var(--text); }
+  .tk .msg { margin-top:16px; padding:14px 20px; background:#f6f8fb; border-left:5px solid #b9c3d3; border-radius:6px; white-space:pre-wrap; }
+
+  .progress { display:flex; align-items:center; gap:24px; }
+  .steps { flex:1; display:flex; align-items:flex-start; }
+  .step { flex:1; text-align:center; position:relative; }
+  .step::before { content:""; position:absolute; top:22px; left:-50%; width:100%; height:4px; background:var(--line); z-index:0; }
+  .step:first-child::before { display:none; }
+  .step.done::before, .step.active::before, .step.wait::before { background:var(--green); }
+  .step .ball { position:relative; z-index:1; width:48px; height:48px; border-radius:50%; margin:0 auto 8px; display:grid; place-items:center; font-size:24px; font-weight:700; background:#fff; border:4px solid var(--line); color:var(--muted); }
+  .step.done .ball { background:var(--green); border-color:var(--green); color:#fff; }
+  .step.active .ball { border-color:var(--purple); color:var(--purple); }
+  .step.wait .ball { border-color:var(--amber-line); background:var(--amber-bg); color:var(--amber); animation:pulse 1.6s ease-in-out infinite; }
+  .step.stop .ball { background:var(--red); border-color:var(--red); color:#fff; }
+  @keyframes pulse { 50% { box-shadow:0 0 0 10px rgba(240,180,41,.25); } }
+  .step .lbl { font-weight:600; font-size:19px; }
+  .step .sub { color:var(--muted); font-size:17px; min-height:24px; }
+  .timer { min-width:220px; text-align:right; }
+  .timer .t { font-size:44px; font-weight:700; font-variant-numeric:tabular-nums; line-height:1; }
+  .timer .l { color:var(--muted); font-size:17px; margin-top:6px; }
+
+  .approval { background:var(--amber-bg); border:2px solid var(--amber-line); }
+  .approval h2, .sent h2, .esc h2 { margin:0 0 6px; font-size:26px; }
+  .approval .to { color:#5c4300; }
+  .approval .body { background:#fff; border-radius:10px; padding:20px 26px; margin:16px 0 20px; font-size:21px; }
+  .approval .actions { display:flex; gap:14px; align-items:center; }
+  .approval .actions .hint { color:#5c4300; font-size:17px; margin-left:8px; }
+  .sent { background:var(--green-bg); border:2px solid #8fd18e; }
+  .esc { background:var(--red-bg); border:2px solid #f1a9a4; }
+  .failed { background:var(--red-bg); border:2px solid #f1a9a4; display:flex; gap:20px; align-items:center; }
+  .failed h2 { margin:0 0 4px; font-size:24px; }
+  .failed div { flex:1; }
+
+  h3.sec { font-size:16px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:32px 0 12px; }
+  .report { border-left:6px solid var(--blue); }
+  .report .who { display:flex; gap:12px; align-items:baseline; margin-bottom:8px; }
+  .report .who b { font-size:23px; }
+  .report .who span { color:var(--muted); font-size:17px; }
+  .report.k-Knowledge-gap { border-left-color:var(--purple); }
+  .report.k-Diagnostics { border-left-color:#0f8a8a; }
+
+  .text { word-wrap:break-word; }
+  .text ul, .text ol { margin:4px 0 4px 26px; padding:0; }
+  .text li { margin:3px 0; }
+  .text .h { font-weight:600; margin:8px 0 2px; }
+  .text .gap { height:10px; }
+  .text a { color:var(--blue); }
+  .text img { max-width:100%; width:880px; border:1px solid var(--line); border-radius:10px; display:block; margin:12px 0 4px; }
+
+  .more { background:none; border:none; color:var(--blue); padding:0; font-weight:600; }
+  .note { border-left:4px solid #c3cad6; padding:8px 16px; margin:10px 0; font-size:17px; color:#3d4450; }
+  .note .w { color:var(--muted); font-size:15px; }
+
+  .modal-bg { position:fixed; inset:0; z-index:100; background:rgba(10,20,40,.45); display:none; align-items:center; justify-content:center; }
+  .modal { background:#fff; border-radius:16px; padding:32px 36px; width:820px; max-width:95vw; }
+  .modal h2 { margin:0 0 6px; font-size:28px; }
+  .modal .sub { color:var(--muted); font-size:18px; }
+  .opt { display:block; border:2px solid var(--line); border-radius:12px; padding:14px 18px; margin-top:12px; cursor:pointer; }
+  .opt input { margin-right:10px; transform:scale(1.4); }
+  .opt:has(input:checked) { border-color:var(--blue); background:#f0f6fd; }
+  .modal .actions { display:flex; justify-content:flex-end; gap:12px; margin-top:24px; }
+  .toast { position:fixed; bottom:28px; left:50%; transform:translateX(-50%); background:#1f2937; color:#fff; padding:14px 24px; border-radius:10px; display:none; max-width:80vw; font-size:19px; }
+  .toast.err { background:var(--red); }
+</style>
+</head>
+<body>
+<header>
+  <button class="toggle" id="listBtn" title="Show or hide the ticket list">&#9776;</button>
+  <div class="logo">C</div>
+  <div class="name">Contoso OrderSync <span>Support Center</span></div>
+  <div class="spacer"></div>
+  <div class="who"><span class="dot" id="dot"></span><span id="who">Connecting...</span></div>
+  <button id="newBtn">+ New ticket</button>
+</header>
+<div class="layout" id="layout">
+  <div class="list"><h2>Open tickets</h2><div id="list"></div></div>
+  <div class="detail" id="detail"><div class="empty">Select a ticket</div></div>
+</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h2>Customer support portal</h2>
+    <div class="sub">This stands in for the customer's portal. Submitting creates a ticket, and the Case Manager picks it up immediately.</div>
+    <div id="examples"></div>
+    <div class="actions">
+      <button id="cancelBtn">Cancel</button>
+      <button class="primary" id="submitBtn">Submit ticket</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const code = new URLSearchParams(location.search).get("code") || "";
+const api = (path) => `/api/console${path}${code ? `?code=${encodeURIComponent(code)}` : ""}`;
+let selected = new URLSearchParams(location.search).get("ticket");
+let busy = {};
+let engineer = "";
+let showDetails = false;
+let clock = null;  // { start, end } for the live timer
+let skew = null;   // server time minus this PC's time, so the live timer is right even if the PC clock is off
+let editing = null;  // { id, mode: "edit" | "changes" } while the engineer is typing in the approval card
+const serverNow = () => new Date(Date.now() + (skew || 0)).toISOString();
+
+const DRAFT = "[Draft awaiting approval]";
+const DISPATCH = "[Sent to Case Manager]";
+const DENIED = "[Case Manager] The support engineer did not approve";
+const CHANGES = "[Changes requested]";
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function inline(h) {
+  h = h.replace(/!\[([^\]]*)\]\((https:\/\/[^)\s]+)\)/g, '<img alt="$1" src="$2">');
+  h = h.replace(/\[([^\]]+)\]\((https:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  // Bare https URLs (not already inside a link or image) become links labelled with just the file name, so the host isn't shown.
+  h = h.replace(/(^|[\s(:])(https:\/\/[^\s<]+?)(?=[.,;:)]*(?:\s|$|<))/g, (_, pre, url) => {
+    let name = url.split(/[?#]/)[0].split("/").filter(Boolean).pop() || "link";
+    try { name = esc(decodeURIComponent(name)); } catch { /* keep the raw, already-escaped name */ }
+    return `${pre}<a href="${url}" target="_blank" rel="noopener">${name}</a>`;
+  });
+  h = h.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+  return h.replace(/(^|[^*\w])\*([^*\s][^*]*)\*(?!\w)/g, "$1<i>$2</i>");
+}
+
+function md(text) {
+  // Escape first, then allow only headings, lists (two levels), https links, images, bold, and italics.
+  const out = [];
+  const stack = [];  // open lists: { kind, indent }
+  const closeTo = (n) => { while (stack.length > n) out.push(`</li></${stack.pop().kind}>`); };
+  for (const line of esc(text).split("\n")) {
+    const head = line.match(/^\s*#{1,4}\s+(.*)$/);
+    const item = line.match(/^(\s*)(?:([-*])|\d+[.)])\s+(.*)$/);
+    if (item) {
+      const kind = item[2] ? "ul" : "ol";
+      const indent = item[1].replace(/\t/g, "  ").length;
+      while (stack.length && indent < stack[stack.length - 1].indent) closeTo(stack.length - 1);
+      const top = stack[stack.length - 1];
+      if (top && indent > top.indent && stack.length < 2) {
+        out.push(`<${kind}>`); stack.push({ kind, indent });
+      } else if (top && top.kind === kind) {
+        out.push("</li>");
+      } else {
+        if (top) closeTo(stack.length - 1);
+        out.push(`<${kind}>`); stack.push({ kind, indent });
+      }
+      out.push(`<li>${inline(item[3])}`);
+      continue;
+    }
+    closeTo(0);
+    if (head) out.push(`<div class="h">${inline(head[1])}</div>`);
+    else if (!line.trim()) out.push('<div class="gap"></div>');
+    else out.push(`<div>${inline(line)}</div>`);
+  }
+  closeTo(0);
+  return out.join("");
+}
+
+const when = (iso) => iso ? new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+const secs = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 1000));
+const dur = (s) => s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
+const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+const statusChip = (s, big) => `<span class="chip ${big ? "big " : ""}s-${esc(s).replace(/ /g, "-")}">${esc(s)}</span>`;
+const sevChip = (s, big) => /^Sev[1-4]$/.test(s || "") ? `<span class="chip ${big ? "big " : ""}sev-${s}">${s}</span>` : "";
+
+function toast(msg, err) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.className = "toast" + (err ? " err" : ""); t.style.display = "block";
+  clearTimeout(t._h); t._h = setTimeout(() => (t.style.display = "none"), err ? 9000 : 4000);
+}
+
+async function call(path, opts = {}) {
+  const r = await fetch(api(path), { headers: { "Content-Type": "application/json" }, ...opts });
+  const served = Date.parse(r.headers.get("Date") || "");
+  if (!isNaN(served)) {
+    const s = served + 500 - Date.now();  // the header is whole seconds
+    if (skew === null || Math.abs(s - skew) > 1500) skew = s;
+  }
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body.error || `Request failed (${r.status})`);
+  return body;
+}
+
+async function loadList() {
+  const data = await call("/tickets");
+  if (data.engineer && data.engineer !== engineer) {
+    engineer = data.engineer;
+    document.getElementById("who").textContent = `${engineer}, Support Engineer`;
+  }
+  document.getElementById("list").innerHTML = data.tickets.map((t) => `
+    <div class="row ${t.ticket_id === selected ? "sel" : ""}" onclick="select('${esc(t.ticket_id)}')">
+      <div class="top"><span><b>${esc(t.ticket_id)}</b> &middot; ${esc(t.customer)}</span><span>${esc(t.tier)}</span></div>
+      <div class="title">${esc(t.title)}</div>
+      <div class="chips">${statusChip(t.status)} ${sevChip(t.severity)}
+        ${t.agent_working ? '<span class="chip c-working"><span class="spin"></span>Agents working</span>' : ""}
+        ${t.run_failed ? '<span class="chip c-failed">Run didn\'t finish</span>' : ""}
+        ${t.awaiting_approval ? '<span class="chip c-approval">Needs approval</span>' : ""}</div>
+    </div>`).join("");
+}
+
+// Read the agents' progress from the ticket's notes, starting at the latest "New ticket" hand-off.
+function progress(t) {
+  const notes = t.notes || [];
+  let start = -1;
+  notes.forEach((n, i) => { if ((n.text || "").startsWith(`${DISPATCH} "New ticket`)) start = i; });
+  if (start < 0) return null;
+  const after = notes.slice(start + 1);
+  const find = (fn) => after.find(fn);
+  const report = (title) => find((n) => (n.text || "").startsWith(`[Report: ${title}]`));
+  const draftIdx = after.findIndex((n) => (n.text || "").startsWith(DRAFT));
+  const draft = after[draftIdx];
+  const later = draftIdx >= 0 ? after.slice(draftIdx + 1) : [];
+  const sent = later.find((n) => n.type === "customer_update");
+  const denied = later.find((n) => (n.text || "").startsWith(DENIED));
+  const knowledge = report("Knowledge gap") || find((n) => (n.text || "").startsWith("[Escalation]"));
+
+  const steps = [{ label: "Received", note: notes[start] }, { label: "Triage", note: report("Triage") }];
+  if (t.has_logs) steps.push({ label: "Diagnostics", note: report("Diagnostics") });
+  if (knowledge) steps.push({ label: "Knowledge gap", note: knowledge });
+  steps.push({ label: "Draft reply", note: draft });
+  steps.push({ label: "Your approval", note: sent || denied, denied: !!denied && !sent });
+  let lastDraft = -1, lastChanges = -1;
+  notes.forEach((n, i) => { const x = n.text || ""; if (x.startsWith(DRAFT)) lastDraft = i; if (x.startsWith(CHANGES)) lastChanges = i; });
+  const revising = !!t.agent_working && lastChanges > lastDraft && lastDraft > start;
+  const guidance = revising ? notes[lastChanges].text.slice(CHANGES.length).trim() : "";
+
+  const t0 = notes[start].created_at;
+  let prev = t0, active = false;
+  for (const s of steps) {
+    if (s.note) {
+      s.state = s.denied ? "stop" : "done";
+      s.sub = s.label === "Received" ? when(t0).split(", ").pop() : s.label === "Your approval" ? (s.denied ? "Denied" : "Sent") : dur(secs(prev, s.note.created_at));
+      prev = s.note.created_at;
+    } else if (!active) {
+      active = true;
+      s.state = s.label === "Your approval" ? (t.awaiting_approval ? "wait" : "active") : (t.agent_working ? "active" : t.run_failed ? "stop" : "");
+      s.sub = s.state === "wait" ? "Waiting for you" : s.state === "active" ? (revising ? "Revising..." : "Working...") : s.state === "stop" ? "Didn't finish" : "";
+    } else { s.state = ""; s.sub = ""; }
+  }
+  return { steps, t0, draft, sent, revising, guidance };
+}
+
+function progressHtml(p, t) {
+  const icon = (s, i) => s.state === "done" ? "&#10003;" : s.state === "stop" ? "&#10005;" : s.state === "active" ? '<span class="spin"></span>' : i + 1;
+  let label;
+  if (p.draft) { clock = null; label = p.sent ? "Sent to the customer" : p.revising ? "First draft in" : "Workflow completed in"; }
+  else if (t.agent_working) { clock = { start: p.t0 }; label = "Agents working"; }
+  else { clock = null; label = t.run_failed ? "Run didn't finish" : "Stopped"; }
+  const lastNote = (t.notes || []).slice(-1)[0];
+  const shown = p.draft ? mmss(secs(p.t0, p.draft.created_at)) : mmss(secs(p.t0, t.agent_working || !lastNote ? serverNow() : lastNote.created_at));
+  return `<div class="card progress">
+    <div class="steps">${p.steps.map((s, i) => `<div class="step ${s.state}"><div class="ball">${icon(s, i)}</div>
+      <div class="lbl">${esc(s.label)}</div><div class="sub">${esc(s.sub)}</div></div>`).join("")}</div>
+    <div class="timer"><div class="t" id="timer">${p.sent ? "&#10003;" : shown}</div><div class="l">${label}</div></div>
+  </div>`;
+}
+
+function noteHtml(n) {
+  return `<div class="note"><div class="w">${esc(n.author)} &middot; ${when(n.created_at)}</div><div class="text">${md(n.text)}</div></div>`;
+}
+
+async function loadDetail() {
+  if (!selected) return;
+  if (editing && editing.id === selected) return;  // don't wipe what the engineer is typing
+  let t;
+  try { t = await call(`/tickets/${encodeURIComponent(selected)}`); }
+  catch (e) {
+    if (/not found/i.test(e.message)) { selected = null; document.getElementById("detail").innerHTML = '<div class="empty">Select a ticket</div>'; return; }
+    throw e;
+  }
+  const c = t.customer || {};
+  const notes = t.notes || [];
+  const working = t.agent_working || busy[t.ticket_id];
+  const canRun = !working && !t.awaiting_approval && !t.run_failed && t.status === "New";
+  const p = progress(t);
+  if (!p) clock = null;
+
+  const reports = [], updates = [], other = [];
+  let escalation = null;
+  for (const n of notes) {
+    const m = (n.text || "").match(/^\[Report: ([^\]]+)\]\s*\n?/);
+    if (m) reports.push({ ...n, title: m[1], body: n.text.slice(m[0].length) });
+    else if (n.type === "customer_update") updates.push(n);
+    else if ((n.text || "").startsWith("[Escalation]")) escalation = n;
+    else if (!(n.text || "").startsWith(DRAFT)) other.push(n);
+  }
+  const offset = (n) => p ? `+${dur(secs(p.t0, n.created_at))}` : when(n.created_at);
+  const details = showDetails || (!reports.length && !updates.length);
+  const draftText = engineer ? (t.draft || "").replaceAll("[Engineer name]", engineer) : t.draft;
+  currentDraft = draftText || "";
+
+  document.getElementById("detail").innerHTML = `<div class="wrap">
+    <div class="card tk">
+      <div class="crumb"><b>${esc(t.ticket_id)}</b> &middot; ${esc(c.name)} &middot; ${esc(c.tier)} support</div>
+      <h1><span>${esc(t.title)}</span>
+        ${canRun ? `<button class="primary" onclick="run('${esc(t.ticket_id)}')">Send to Case Manager</button>` : ""}</h1>
+      <div class="chips">${statusChip(t.status, true)} ${sevChip(t.severity, true)}
+        ${working ? '<span class="chip big c-working"><span class="spin"></span>Agents working</span>' : ""}
+        ${t.awaiting_approval ? '<span class="chip big c-approval">Needs your approval</span>' : ""}</div>
+      <div class="facts"><span>Contact <b>${esc(c.contact_name)}</b></span><span>Version <b>${esc(t.product_version)}</b></span>
+        <span>Logs <b>${t.has_logs ? "Attached" : "None"}</b></span><span>Opened <b>${when(t.created_at)}</b></span></div>
+      <div class="msg">${esc(t.description)}</div>
+    </div>
+    ${p ? progressHtml(p, t) : ""}
+    ${t.run_failed ? `<div class="card failed"><div><h2>The agents' last run didn't finish</h2>
+      <div class="text">${esc(t.run_error || "")}</div></div>
+      <button class="primary" onclick="retry('${esc(t.ticket_id)}')">Retry</button></div>` : ""}
+    ${p && p.revising ? `<div class="card revising">
+      <h2><span class="spin"></span>Revising the email with your guidance</h2>
+      <div class="text">&ldquo;${esc(p.guidance)}&rdquo;</div></div>` : ""}
+    ${t.awaiting_approval ? `<div class="card approval">
+      <h2>Reply ready for your approval${t.draft_author && t.draft_author !== "case-manager" ? `<span class="edited">Edited by ${esc(t.draft_author)}</span>` : ""}</h2>
+      <div class="to">To: <b>${esc(c.contact_name)}</b> &lt;${esc(c.contact_email)}&gt;</div>
+      <div class="body text">${md(draftText)}</div>
+      <div class="actions">
+        <button class="approve" onclick="decide('${esc(t.ticket_id)}','approve')">Approve and send</button>
+        <button class="alt" onclick="startEdit('${esc(t.ticket_id)}','edit')">Edit</button>
+        <button class="alt" onclick="startEdit('${esc(t.ticket_id)}','changes')">Ask for changes</button>
+        <button class="deny" onclick="decide('${esc(t.ticket_id)}','deny')">Don't send</button>
+        <span class="hint">Nothing reaches the customer until you approve.</span></div>
+    </div>` : ""}
+    ${updates.slice().reverse().map((n) => `<div class="card sent"><h2>&#10003; Email sent to ${esc(c.contact_name)}</h2>
+      <div class="w">Approved by ${esc(n.author)} &middot; ${when(n.created_at)}</div><div class="text" style="margin-top:12px">${md(n.text)}</div></div>`).join("")}
+    ${escalation ? `<div class="card esc"><h2>Escalated to an engineer</h2><div class="text">${md(escalation.text.replace(/^\[Escalation\]\s*/, ""))}</div></div>` : ""}
+    ${reports.length ? `<h3 class="sec">What the agents found</h3>` : ""}
+    ${reports.map((r) => `<div class="card report k-${esc(r.title).replace(/ /g, "-")}">
+      <div class="who"><b>${esc(r.title)}</b><span>${esc(r.author)} &middot; ${offset(r)}</span></div>
+      <div class="text">${md(r.body)}</div></div>`).join("")}
+    ${other.length ? `<h3 class="sec"><button class="more" onclick="toggleDetails()">${details ? "Hide" : "Show"} technical activity (${other.length})</button></h3>` : ""}
+    ${details ? `<div class="card">${other.slice().reverse().map(noteHtml).join("")}</div>` : ""}
+  </div>`;
+}
+
+function tick() {
+  const el = document.getElementById("timer");
+  if (el && clock) el.textContent = mmss(secs(clock.start, serverNow()));
+}
+
+async function refresh() {
+  try {
+    await Promise.all([loadList(), loadDetail()]);
+    document.getElementById("dot").className = "dot";
+  } catch (e) {
+    document.getElementById("dot").className = "dot off";
+  }
+}
+
+function select(id) {
+  selected = id;
+  editing = null;
+  const u = new URL(location.href); u.searchParams.set("ticket", id); history.replaceState(null, "", u);
+  refresh();
+}
+function toggleDetails() { showDetails = !showDetails; loadDetail(); }
+
+async function dispatch(id, fn, okMsg) {
+  busy[id] = true; refresh();
+  try { await fn(); toast(okMsg); }
+  catch (e) { toast(e.message, true); }
+  finally { setTimeout(() => { delete busy[id]; }, 4000); refresh(); }
+}
+const run = (id) => dispatch(id, () => call(`/tickets/${id}/run`, { method: "POST" }), `${id} sent to the Case Manager.`);
+const retry = (id) => dispatch(id, () => call(`/tickets/${id}/run`, { method: "POST", body: JSON.stringify({ retry: true }) }), `${id} sent to the Case Manager again.`);
+const decide = (id, decision, extra = {}) => dispatch(id,
+  () => call(`/tickets/${id}/decision`, { method: "POST", body: JSON.stringify({ decision, ...extra }) }),
+  decision === "approve" ? "Approved. The Case Manager is sending the email."
+    : decision === "revise" ? "Sent to the drafting agent. A new draft is on its way."
+    : "Not sent. The draft stays on the ticket.");
+
+// Edit or Ask for changes: swap the approval card's body for a text box. Refresh pauses until Send or Cancel.
+let currentDraft = "";
+function startEdit(id, mode) {
+  const card = document.querySelector(".card.approval");
+  if (!card) return;
+  editing = { id, mode };
+  const isEdit = mode === "edit";
+  card.querySelector(".body").outerHTML = `<textarea id="editBox" rows="${isEdit ? 14 : 4}"
+    placeholder="${isEdit ? "" : "Tell the agents what to change. For example: Also tell her the 4.2.1 upgrade fixes this for good."}"></textarea>`;
+  const box = document.getElementById("editBox");
+  if (isEdit) box.value = currentDraft;
+  card.querySelector(".actions").innerHTML = isEdit
+    ? `<button class="approve" onclick="finishEdit()">Approve and send edited email</button>
+       <button onclick="cancelEdit()">Cancel</button><span class="hint">Your edited version is what the customer gets.</span>`
+    : `<button class="primary" style="padding:14px 28px;font-size:22px" onclick="finishEdit()">Ask agents to revise</button>
+       <button onclick="cancelEdit()">Cancel</button><span class="hint">The drafting agent rewrites it. You approve again.</span>`;
+  box.focus();
+}
+function cancelEdit() { editing = null; loadDetail(); }
+function finishEdit() {
+  const text = document.getElementById("editBox").value.trim();
+  if (!text) { toast(editing.mode === "edit" ? "The email is empty." : "Tell the agents what to change.", true); return; }
+  const { id, mode } = editing;
+  editing = null;
+  if (mode === "edit") decide(id, "approve", { message: text });
+  else decide(id, "revise", { guidance: text });
+}
+
+const layout = document.getElementById("layout");
+if (localStorage.getItem("hideList") === "1") layout.classList.add("collapsed");
+document.getElementById("listBtn").onclick = () => {
+  layout.classList.toggle("collapsed");
+  localStorage.setItem("hideList", layout.classList.contains("collapsed") ? "1" : "0");
+};
+
+document.getElementById("newBtn").onclick = async () => {
+  const data = await call("/examples");
+  document.getElementById("examples").innerHTML = data.examples.map((e, i) =>
+    `<label class="opt"><input type="radio" name="ex" value="${esc(e.id)}" ${i === 0 ? "checked" : ""}>${esc(e.label)}</label>`).join("");
+  document.getElementById("modalBg").style.display = "flex";
+};
+document.getElementById("cancelBtn").onclick = () => (document.getElementById("modalBg").style.display = "none");
+document.getElementById("submitBtn").onclick = async () => {
+  const btn = document.getElementById("submitBtn"); btn.disabled = true;
+  try {
+    const example = document.querySelector('input[name="ex"]:checked').value;
+    const t = await call("/tickets", { method: "POST", body: JSON.stringify({ example }) });
+    document.getElementById("modalBg").style.display = "none";
+    if (t.dispatch_error) toast(`${t.ticket_id} was created, but the Case Manager was not started: ${t.dispatch_error}`, true);
+    else toast(`${t.ticket_id} submitted. The Case Manager is on it.`);
+    select(t.ticket_id);
+  } catch (e) { toast(e.message, true); }
+  finally { btn.disabled = false; }
+};
+
+refresh();
+setInterval(refresh, 3000);
+setInterval(tick, 1000);
+</script>
+</body>
+</html>

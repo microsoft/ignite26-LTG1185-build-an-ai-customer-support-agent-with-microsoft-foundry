@@ -1,0 +1,8 @@
+.venv/
+.vscode/
+__pycache__/
+tests/
+local.settings.json
+test-mcp.ps1
+README.md
+deploy.ps1
