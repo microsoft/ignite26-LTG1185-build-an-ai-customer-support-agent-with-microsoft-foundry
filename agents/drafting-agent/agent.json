@@ -17,7 +17,8 @@
         "server_url": "${TICKET_SYSTEM_MCP_URL}",
         "allowed_tools": {
           "tool_names": [
-            "get_ticket"
+            "get_ticket",
+            "get_customer_memory"
           ]
         },
         "require_approval": "never",
@@ -29,12 +30,6 @@
         "server_url": "${KNOWLEDGE_BASE_MCP_URL}",
         "require_approval": "never",
         "project_connection_id": "support-kb"
-      },
-      {
-        "type": "memory_search_preview",
-        "memory_store_name": "customer-memory",
-        "scope": "contoso-support-customers",
-        "update_delay": 30
       }
     ],
     "tool_choice": "auto",

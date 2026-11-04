@@ -69,14 +69,14 @@ flowchart LR
     toolbox -->|MCP| console
     triage & diag & draft & kn & followup -->|MCP tools| console
     triage & diag & draft & kn & followup -->|MCP| kb
-    triage & draft --> memory
+    console -->|reads, writes case history| memory
     kb --- search[(Azure AI Search<br/>+ Blob Storage)]
     foundry -.->|traces| ai[(Application Insights)]
 ```
 
 Open the support console, pick ticket **TCK-1042** (a Premier customer whose orders stopped syncing before a big sale), and select **Send to Case Manager**. About two minutes later:
 
-1. **Triage** sets the severity from the support policy (KB-107) and pulls up what we know about the customer from memory: Dana prefers short bullet points and had a similar incident last quarter.
+1. **Triage** sets the severity from the support policy (KB-107) and pulls up what we know about the customer from memory (read-only, through the ticket system, and only this customer's scope): Dana prefers short bullet points and had a similar incident last quarter.
 2. **Diagnostics** runs Python over the attached logs with Code Interpreter, charts the error spike, and matches the error to a known issue (KB-104).
 3. **Drafting** writes the customer email: plain-language cause, both fix options, and a next-update time computed from the response target, in bullets, because that's how Dana likes it.
 4. The **Case Manager** saves the draft on the ticket and stops. You read it in the console and approve it, edit it, ask for changes, or decline. Only an approval sends it.

@@ -49,7 +49,7 @@ Foundry may create the `support-kb` connection for you when you add the knowledg
 
 ## 4. Memory
 
-**What it is:** a memory store keeps durable facts across conversations. The drafting agent remembers how each customer likes to be written to; triage remembers past incidents.
+**What it is:** a memory store keeps durable facts about each customer. The drafting agent knows how each customer likes to be written to; triage knows past incidents.
 
 1. Go to **Build** > **Memory** > **Create memory store**.
 2. Name: `customer-memory`. Chat model `gpt-5-mini`, embedding model `text-embedding-3-small`.
@@ -57,7 +57,7 @@ Foundry may create the `support-kb` connection for you when you add the knowledg
    *Remember durable facts about each customer organization: preferred communication style and format, key contacts and their roles, product versions and environment, past incidents with ticket IDs, root causes, and fixes, and support tier. Do not store passwords, API keys, secrets, connection strings, payment details, or personal information unrelated to the support relationship.*
 4. Turn on **Chat summary**.
 
-The agents use the scope `contoso-support-customers`. The demo reset (`python scripts/reset_demo.py`) wipes that scope and seeds a few known facts, such as Dana at Contoso preferring short bullet points.
+Each customer gets its own scope, named after the customer ID (for example `CUST-CONTOSO`). The agents don't get a memory tool: they read memory through the ticket system's `get_customer_memory` tool, which returns only the ticket's customer. The ticket system writes a case-history item when an update is sent or a ticket is resolved. The demo reset (`python scripts/reset_demo.py`) wipes every customer's scope and seeds a few known facts, such as Dana at Contoso preferring short bullet points.
 
 ## 5. The prompt agents
 
@@ -67,13 +67,13 @@ Go to **Build** > **Agents** > **Create agent** for each agent below. Paste the 
 
 | Agent | Model | Ticket-system tools (MCP, `ticket-system` connection) | Other tools |
 |---|---|---|---|
-| `triage-agent` | `gpt-5.4-mini` | `get_ticket`, `update_ticket_status`, `add_ticket_note` | Knowledge (`support-kb`), Memory (`customer-memory`) |
+| `triage-agent` | `gpt-5.4-mini` | `get_ticket`, `update_ticket_status`, `add_ticket_note`, `get_customer_memory` | Knowledge (`support-kb`) |
 | `diagnostics-agent` | `gpt-5-mini` | `get_log_stats`, `get_logs`, `add_ticket_note` | Knowledge, Code interpreter |
 | `knowledge-agent` | `gpt-5-mini` | `get_ticket`, `get_log_stats` | Knowledge |
-| `drafting-agent` | `gpt-5-mini` | `get_ticket` | Knowledge, Memory |
+| `drafting-agent` | `gpt-5-mini` | `get_ticket`, `get_customer_memory` | Knowledge |
 | `followup-agent` | `gpt-5-mini` | `list_open_tickets`, `get_ticket`, `add_ticket_note` | Knowledge |
 
-For the ticket-system MCP tool, set approval to **Never** and limit it to the listed tools. None of the prompt agents gets `send_customer_update`. For memory, use scope `contoso-support-customers`.
+For the ticket-system MCP tool, set approval to **Never** and limit it to the listed tools. None of the prompt agents gets `send_customer_update`.
 
 Try the triage agent in its playground: *"Triage ticket TCK-1042."* It should read the ticket, check KB-107, set Sev2, and write a report.
 

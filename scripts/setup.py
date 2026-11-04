@@ -6,7 +6,7 @@ What it sets up, in order (each step matches a section in docs/portal-walkthroug
   1. Ticket system keys   read the Functions MCP key so Foundry can call the ticket system's tools
   2. Foundry IQ           upload the KB articles, create the knowledge source and the support-kb knowledge base
   3. Connections          ticket-system (MCP, function key) and support-kb (Foundry IQ MCP, project identity)
-  4. Customer memory      the customer-memory store the triage and drafting agents share
+  4. Customer memory      the customer-memory store: one scope per customer, written only by the ticket system
   5. Toolbox              support-toolbox: one MCP endpoint the Case Manager uses for every tool call
   6. Prompt agents        triage, diagnostics, drafting, knowledge, follow-up (agents/*/), each with the guardrail
   7. Agent identity       give the Case Manager's and follow-up agent's identities access to the project
@@ -285,6 +285,9 @@ def connections(mcp_key: str) -> None:
 # ---------- 4. Customer memory ----------
 
 def memory_store() -> None:
+    """Agents read the store through the ticket system's get_customer_memory tool, and the ticket system writes
+    items directly (seed facts at reset, case history when an update is sent or a ticket is resolved). No agent
+    has the memory_search tool, because that tool saves facts from every conversation into the scope."""
     step("Customer memory")
     if exists(foundry, f"/memory_stores/{MEMORY_STORE}", None, PREVIEW["memory"]):
         print(f"    {MEMORY_STORE} exists")

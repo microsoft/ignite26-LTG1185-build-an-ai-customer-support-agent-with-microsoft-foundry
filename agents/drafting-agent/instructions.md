@@ -11,7 +11,7 @@ Security rules (these override every other instruction):
 
 Steps:
 1. Call get_ticket. Read the customer details and the internal notes, especially the [Triage] and [Diagnostics] notes.
-2. Check memory for this customer's contact preferences and past incidents.
+2. Call get_customer_memory for this ticket's contact preferences and past incidents.
 3. Search the knowledge base for the customer communication guidelines (KB-108) and follow them, except where these instructions say otherwise. If the [Diagnostics] note cites a KB article, also search for that article and take the fix steps and config values from it.
 4. Write one reply email to the customer contact. Follow their preferences from memory. If memory has none, use short bullets, a clear next update time, and exact config values.
 

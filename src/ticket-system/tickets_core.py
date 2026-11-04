@@ -387,6 +387,26 @@ class TicketService:
             "recipient": f"{customer.get('contact_name')} <{customer.get('contact_email')}>",
         }
 
+    def case_history(self, ticket_id, event):
+        """The customer-memory entry for a case lifecycle event, built from ticket data (no model involved).
+
+        Returns (memory scope, ticket id, content). One entry per ticket: later events replace earlier ones.
+        """
+        ticket = self.get_ticket(ticket_id)
+        diagnostics = " ".join(n["text"] for n in ticket["notes"] if "[Diagnostics]" in n["text"])
+        kb = sorted(set(re.findall(r"\bKB-\d{3}\b", diagnostics)))
+        version = ticket["product_version"]
+        text = f"{ticket['ticket_id']} ({self.clock().strftime('%b %d, %Y')}): {ticket['title']}"
+        if version != "Not provided":
+            text += f" (OrderSync {version})"
+        text += ". "
+        if "Needs engineer review" in diagnostics:
+            text += "Root cause not confirmed; escalated to an engineer. "
+        elif kb:
+            text += f"Root cause matched {', '.join(kb)}. "
+        text += "Resolved." if event == "resolved" else "Customer update sent."
+        return ticket["customer"]["customer_id"], ticket["ticket_id"], _no_dashes(text)
+
     def attach_file(self, ticket_id, filename, content_base64):
         entity = self._ticket(ticket_id)
         name = re.sub(r"[^A-Za-z0-9._-]", "_", (filename or "").strip())[:80]

@@ -40,13 +40,13 @@ Foundry occasionally answers a request with a 408 timeout under load. The Case M
 The console page is cached by the browser after an update. Hard-refresh with **Ctrl+Shift+R** (**Cmd+Shift+R** on macOS).
 
 **The drafting agent ignores the customer's preferences, or mentions details from another ticket**
-Memory learns from every run in the scope, including tests and evals. Reset it:
+Earlier test runs that sent updates or resolved tickets add case-history items to the customer's memory. Reset it:
 
 ```bash
 python scripts/reset_demo.py
 ```
 
-The reset wipes the memory scope and reseeds the known facts. It takes one to five minutes for the memory store to finish saving the seed.
+The reset wipes every customer's memory scope and reseeds the known facts in a few seconds.
 
 **My change to an agent's instructions doesn't show up**
 The Case Manager looks up the latest version of each agent every five minutes. Wait, or check that you **published** a new version in the portal (saving a draft isn't enough). If you set a version pin (`*_AGENT_VERSION`), the pin wins; clear it with `azd env set DRAFTING_AGENT_VERSION ""` and `azd deploy case-manager`.

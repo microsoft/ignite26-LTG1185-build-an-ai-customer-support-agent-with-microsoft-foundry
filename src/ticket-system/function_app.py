@@ -7,13 +7,12 @@ Auth: send the `mcp_extension` system key in the `x-functions-key` header.
 import json
 import logging
 import os
-import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
 import azure.functions as func
 
-from tickets_core import RUN_TOKEN, TicketService, new_run_token, to_json, with_token
+from tickets_core import CLOSED_STATUSES, RUN_TOKEN, TicketService, new_run_token, to_json, with_token
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 _cred = None
@@ -176,7 +175,35 @@ def add_ticket_note(context) -> str:
 )
 def update_ticket_status(context) -> str:
     a = _args(context)
-    return _run("update_ticket_status", lambda: service().update_ticket_status(a.get("ticket_id"), a.get("status"), a.get("severity")))
+
+    def update():
+        result = service().update_ticket_status(a.get("ticket_id"), a.get("status"), a.get("severity"))
+        if result["status"] in CLOSED_STATUSES:
+            _record_case_history(result["ticket_id"], "resolved")
+        return result
+
+    return _run("update_ticket_status", update)
+
+
+@app.mcp_tool_trigger(
+    arg_name="context",
+    tool_name="get_customer_memory",
+    description="Read what we know about the ticket's customer: contacts, communication preferences, and past incidents. Read-only: the ticket system records case history itself.",
+    tool_properties=_props(TICKET_ID),
+)
+def get_customer_memory(context) -> str:
+    a = _args(context)
+
+    def read():
+        customer = service().get_ticket(a.get("ticket_id"))["customer"]
+        items = _memory_items(customer["customer_id"])
+        return {
+            "customer": customer["name"],
+            "memories": [{"kind": i.get("kind"), "content": i.get("content")} for i in items]
+            or "No memories yet for this customer.",
+        }
+
+    return _run("get_customer_memory", read)
 
 
 @app.mcp_tool_trigger(
@@ -198,7 +225,13 @@ def list_open_tickets(context) -> str:
 )
 def send_customer_update(context) -> str:
     a = _args(context)
-    return _run("send_customer_update", lambda: service().send_customer_update(a.get("ticket_id"), a.get("message")))
+
+    def send():
+        result = service().send_customer_update(a.get("ticket_id"), a.get("message"))
+        _record_case_history(result["ticket_id"], "update_sent")
+        return result
+
+    return _run("send_customer_update", send)
 
 
 @app.mcp_tool_trigger(
@@ -298,8 +331,8 @@ def reset_demo(req: func.HttpRequest) -> func.HttpResponse:
     """Reset all demo data (requires a function key). Not exposed as an MCP tool, so agents can't call it.
 
     Like a real queue, every open ticket that arrives as New is handed to the Case Manager, so nothing sits
-    unhandled. Customer memory is wiped and reseeded first, and again after those runs, because every run
-    writes to the shared memory scope (see _reset_flow). Add ?run=false to reset without starting any runs.
+    unhandled. Customer memory is wiped and reseeded first, so the runs read only the seed facts. Agents only
+    read memory, so nothing needs cleaning up afterwards. Add ?run=false to reset without starting any runs.
     """
     try:
         result = service().reset_demo()
@@ -307,12 +340,13 @@ def reset_demo(req: func.HttpRequest) -> func.HttpResponse:
         if req.params.get("run", "true").lower() != "false":
             queue = sorted(t["ticket_id"] for t in service().console_list()["tickets"] if t["status"] == "New")
             result["case_manager_started"] = queue
-        threading.Thread(target=_reset_flow, args=(queue,), daemon=True, name="reset-flow").start()
-        result["memory"] = (
-            "Wiping and reseeding customer memory. Runs start once the seed is saved (usually 1-5 minutes). "
-            f"Memory is wiped and reseeded again {MEMORY_CLEANUP_DELAY // 60} minutes after the runs start."
-            if queue else "Wiping and reseeding customer memory."
-        )
+        try:
+            result["memory"] = _reseed_memory()
+        except Exception as e:
+            logging.exception("Reset: memory reseed failed")
+            result["memory"] = f"Customer memory reseed failed: {e}"
+        for i, ticket_id in enumerate(queue):
+            _dispatch(ticket_id, f"New ticket {ticket_id}", delay=i * 5)
         return func.HttpResponse(to_json(result), mimetype="application/json")
     except Exception as e:
         logging.exception("Reset failed")
@@ -320,7 +354,8 @@ def reset_demo(req: func.HttpRequest) -> func.HttpResponse:
 
 
 MEMORY_STORE = "customer-memory"
-MEMORY_CLEANUP_DELAY = 15 * 60  # runs take about 3 minutes, and their memory writes can sit queued for about 8 more
+MEMORY_PREVIEW = "MemoryStores=V1Preview"
+LEGACY_MEMORY_SCOPES = ["contoso-support-customers"]  # the shared scope used before per-customer scopes
 
 
 def _foundry(method: str, path: str, body: dict | None = None, preview: str | None = None, timeout: int = 60) -> dict:
@@ -336,47 +371,47 @@ def _foundry(method: str, path: str, body: dict | None = None, preview: str | No
         return json.loads(r.read() or b"{}")
 
 
-def _reseed_memory(wait: float = 300) -> str:
-    """Wipe the customer memory scope, then reseed Dana's facts and wait until the store has saved them.
+def _memory(method: str, path: str, body: dict | None = None) -> dict:
+    sep = "&" if "?" in path else "?"
+    return _foundry(method, f"/memory_stores/{MEMORY_STORE}{path}{sep}api-version=v1", body, MEMORY_PREVIEW)
 
-    The seed goes through the triage agent, because calling the store's update API directly fails with a 401
-    from the store's model. Returns the final update status.
-    """
-    from seed_data import MEMORY_SCOPE, MEMORY_SEED
 
-    mem = "MemoryStores=V1Preview"
-    _foundry("POST", f"/memory_stores/{MEMORY_STORE}:delete_scope?api-version=v1", {"scope": MEMORY_SCOPE}, mem)
-    agent = {"type": "agent_reference", "name": "triage-agent"}
-    if os.getenv("TRIAGE_AGENT_VERSION"):
-        agent["version"] = os.environ["TRIAGE_AGENT_VERSION"]
-    response = _foundry("POST", "/openai/v1/responses", {"agent_reference": agent, "input": MEMORY_SEED}, timeout=180)
-    update = next((o.get("update_id") for o in response.get("output", []) if o.get("type") == "memory_search_call"), None)
-    if not update:
-        return "no memory update returned"
-    deadline, status = time.time() + wait, "queued"
-    while time.time() < deadline:
-        status = _foundry("GET", f"/memory_stores/{MEMORY_STORE}/updates/{update}?api-version=v1", preview=mem).get("status")
-        if status not in ("queued", "in_progress"):
+def _memory_items(scope: str) -> list:
+    """Every item in a customer's scope, oldest first. Listing is exact: no search model involved."""
+    items, after = [], None
+    while True:
+        page = _memory("POST", "/items:list" + (f"?after={after}" if after else ""), {"scope": scope})
+        items += page.get("data", [])
+        if not page.get("has_more"):
             break
-        time.sleep(10)
-    return status
+        after = page["last_id"]
+    return sorted(items, key=lambda i: i.get("updated_at", 0))
 
 
-def _reset_flow(queue: list) -> None:
-    """Reseed memory, start the queued runs, then clean memory again once those runs have written to it."""
+def _reseed_memory() -> str:
+    """Wipe every customer scope and write the seed items directly. Deterministic and takes a few seconds."""
+    import seed_data
+
+    for scope in [*seed_data.CUSTOMERS, *LEGACY_MEMORY_SCOPES]:
+        _memory("POST", ":delete_scope", {"scope": scope})
+    count = 0
+    for scope, items in seed_data.MEMORY_SEED.items():
+        for kind, content in items:
+            _memory("POST", "/items", {"scope": scope, "kind": kind, "content": content})
+            count += 1
+    return f"Customer memory wiped and reseeded ({count} items)."
+
+
+def _record_case_history(ticket_id: str, event: str) -> None:
+    """Write (or replace) this ticket's case-history item in its customer's memory scope. Best effort: the
+    ticket action already succeeded, so a memory failure is logged, not returned to the agent."""
     try:
-        logging.info("Reset: memory reseed %s", _reseed_memory())
+        scope, tid, content = service().case_history(ticket_id, event)
+        existing = next((i for i in _memory_items(scope) if i.get("content", "").startswith(f"{tid} (")), None)
+        body = {"scope": scope, "kind": "user_profile", "content": content}  # user_profile so the portal Memories page lists it
+        _memory("POST", f"/items/{existing['memory_id']}" if existing else "/items", body)
     except Exception:
-        logging.exception("Reset: memory reseed failed")
-    for i, ticket_id in enumerate(queue):
-        _dispatch(ticket_id, f"New ticket {ticket_id}", delay=i * 5)
-    if not queue:
-        return
-    time.sleep(MEMORY_CLEANUP_DELAY)
-    try:
-        logging.info("Reset: memory cleanup %s", _reseed_memory())
-    except Exception:
-        logging.exception("Reset: memory cleanup failed")
+        logging.exception("Case history for %s was not saved to customer memory", ticket_id)
 
 
 # ---------- Support console: the "existing ticket system" UI that support engineers use ----------

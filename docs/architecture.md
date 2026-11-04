@@ -86,9 +86,9 @@ Each specialist is a **prompt agent**: a model deployment, instructions, and a s
 
 | Agent | Model | Job | Tools |
 |---|---|---|---|
-| `triage-agent` | gpt-5.4-mini | Sets severity from KB-107, checks the customer's history | ticket system (get, status, note), knowledge base, memory |
+| `triage-agent` | gpt-5.4-mini | Sets severity from KB-107, checks the customer's history | ticket system (get, status, note, customer memory), knowledge base |
 | `diagnostics-agent` | gpt-5-mini | Analyzes logs with Python, charts the spike, matches a KB article | ticket system (log stats, logs, note), knowledge base, Code Interpreter |
-| `drafting-agent` | gpt-5-mini | Writes the customer email in the contact's preferred style | ticket system (get), knowledge base, memory |
+| `drafting-agent` | gpt-5-mini | Writes the customer email in the contact's preferred style | ticket system (get, customer memory), knowledge base |
 | `knowledge-agent` | gpt-5-mini | When no article matches, drafts a new one for review | ticket system (get, log stats), knowledge base |
 | `followup-agent` | gpt-5-mini | Daily check of tickets waiting on the customer or overdue | ticket system (list, get, note), knowledge base |
 
@@ -130,11 +130,13 @@ To use your own content, replace the files in `knowledge-base/` and run `azd dep
 
 ## Memory
 
-A Foundry **memory store** (`customer-memory`) keeps durable facts about each customer across conversations: contacts, preferred communication style, product versions, and past incidents. Triage and drafting have a `memory_search` tool scoped to the support team's customers.
+A Foundry **memory store** (`customer-memory`) keeps durable facts about each customer: contacts, preferred communication style, and past incidents. Each customer has its own scope, named after the customer ID (for example `CUST-CONTOSO`), so you can open it in the portal's Memory page.
 
-Memory is how the drafting agent knows that Dana at Contoso Retail wants short bullet points with exact config values, and how triage knows Contoso had a similar outage in June. Nobody wrote a CRM integration for that. The store extracts facts from conversations in the background and consolidates them, and its instructions say what to keep and what never to store (secrets, payment details, unrelated personal data).
+Memory is how the drafting agent knows that Dana at Contoso Retail wants short bullet points with exact config values, and how triage knows Contoso had a similar outage in June.
 
-**One thing to know:** memory learns from every conversation in the scope, including test runs. The demo reset (`scripts/reset_demo.py`) wipes the scope and reseeds a known baseline so every demo starts the same. In production you'd scope memory per customer and manage retention; see [security and production](security-and-production.md#memory).
+**Agents read memory; they never write it.** Triage and drafting call the ticket system's `get_customer_memory` MCP tool. The ticket system looks up the ticket's customer and returns only that customer's scope, so an agent can't ask for another customer's memory, and a prompt injection in a ticket can't plant anything in memory. The ticket system writes memory itself, from ticket data rather than conversations: when an update is sent or a ticket is resolved, it saves one case-history item per ticket (for example *"TCK-1042 (Nov 18, 2026): ... Root cause matched KB-104. Customer update sent."*).
+
+The demo reset wipes every customer's scope and reseeds a known baseline, so every demo starts the same. See [security and production](security-and-production.md#memory).
 
 ## Guardrails
 
@@ -175,7 +177,7 @@ Nothing in this sample uses an API key that you have to handle. Local auth is di
 |---|---|---|
 | Foundry project managed identity | read the search index (knowledge base MCP) | Bicep |
 | Azure AI Search managed identity | read the KB blobs, call the embedding model | Bicep |
-| Function App managed identity | read and write ticket tables, dispatch routines, reseed memory | Bicep |
+| Function App managed identity | read and write ticket tables, dispatch routines, read and write customer memory | Bicep |
 | Case Manager agent identity | call the prompt agents and the toolbox | setup script (after deploy) |
 | Follow-up agent identity | run from its routine | setup script (after deploy) |
 | You (the deployer) | Foundry User, search and storage data roles, to run setup and evals | Bicep |

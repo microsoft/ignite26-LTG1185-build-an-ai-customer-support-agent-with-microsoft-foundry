@@ -28,6 +28,18 @@ class TicketServiceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.svc.get_ticket("TCK-9999")
 
+    def test_case_history_is_built_from_ticket_data(self):
+        self.svc.add_ticket_note("TCK-1042", "[Diagnostics] Matches KB-104 (pool exhaustion).", "diagnostics-agent")
+        scope, tid, text = self.svc.case_history("TCK-1042", "update_sent")
+        self.assertEqual((scope, tid), ("CUST-CONTOSO", "TCK-1042"))
+        self.assertTrue(text.startswith("TCK-1042 ("))
+        self.assertIn("Root cause matched KB-104.", text)
+        self.assertTrue(text.endswith("Customer update sent."))
+        self.svc.add_ticket_note("TCK-1042", "[Diagnostics] Needs engineer review.", "diagnostics-agent")
+        text = self.svc.case_history("TCK-1042", "resolved")[2]
+        self.assertIn("escalated to an engineer", text)
+        self.assertTrue(text.endswith("Resolved."))
+
     def test_eval_tickets_are_readable_but_hidden(self):
         self.assertEqual(self.svc.get_ticket("eval-01")["customer"]["tier"], "Premier")
         visible = [t["ticket_id"] for t in self.svc.console_list()["tickets"]]

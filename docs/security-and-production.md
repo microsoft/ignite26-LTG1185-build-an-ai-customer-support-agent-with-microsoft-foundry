@@ -39,12 +39,16 @@ Everything here uses public endpoints. For production, use private networking: a
 
 ### Memory
 
-The demo uses one memory scope for all customers so a reset is simple. In production:
+The sample already does the two things that matter most:
 
-- **Scope memory per customer** (for example the customer ID), so one customer's facts can never surface in another customer's ticket.
-- Keep the store's instructions about what never to store, and review them with your privacy team.
+- **One scope per customer** (the customer ID), and the agents only reach memory through `get_customer_memory`, which picks the scope from the ticket on the server side. One customer's facts can't surface in another customer's ticket.
+- **Agents can't write memory.** Only the ticket system writes it, from ticket data, when an update is sent or a ticket is resolved. Memory never holds prompts, agent instructions, or text a customer typed, so a prompt injection can't persist.
+
+In production, also:
+
 - Decide on retention, and how you'll honor deletion requests (delete the customer's scope).
-- Don't wipe memory on a schedule like the demo reset does.
+- Review what the ticket system writes with your privacy team.
+- Don't wipe memory like the demo reset does.
 
 ### Agent versions
 

@@ -12,15 +12,18 @@ Story bible (keep consistent with KB articles and memory seeds):
   a summer sale). Contact Dana Whitfield prefers short bullet-point updates with a clear ETA.
 """
 
-# Customer memory (Foundry memory store "customer-memory"). The demo reset wipes this scope and reseeds it,
-# because every agent run writes to the same scope and dry runs leave other tickets' details behind.
-MEMORY_SCOPE = "contoso-support-customers"
-MEMORY_SEED = (
-    "Remember these facts about the customer Contoso Retail: Contoso Retail is a Premier support customer. "
-    "Dana Whitfield (dana.whitfield@contoso.com) is their IT Ops lead. Dana prefers short bullet points with a "
-    "clear ETA and exact config values. Past ticket TCK-0877 (June): HTTP 429 rate limiting during the summer sale "
-    "on v4.0.5, resolved by raising the API rate limit tier."
-)
+# Customer memory (Foundry memory store "customer-memory"), one scope per customer ID. Agents only read it
+# (get_customer_memory). The ticket system writes it: these seed items at reset, then one case-history item
+# per ticket when an approved update is sent or the ticket is resolved. Customers not listed start empty.
+MEMORY_SEED = {
+    "CUST-CONTOSO": [
+        ("user_profile", "Contoso Retail is a Premier support customer. Dana Whitfield (dana.whitfield@contoso.com) "
+                         "is their IT Ops lead."),
+        ("user_profile", "Dana Whitfield prefers short bullet points with a clear ETA and exact config values."),
+        ("user_profile", "TCK-0877 (June): HTTP 429 rate limiting during the summer sale on OrderSync v4.0.5. "
+                         "Resolved by raising the API rate limit tier."),
+    ],
+}
 
 CUSTOMERS = {
     "CUST-CONTOSO": {

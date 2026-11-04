@@ -15,7 +15,7 @@ Each suite resets the demo tickets first, registers the custom evaluator, create
 
 Run with `--repeat 3` when you compare versions. Models don't answer the same way twice, and a single run of eight cases can swing by one or two either way.
 
-> The runs talk to the real agents, so they write to customer memory. Run `python scripts/reset_demo.py` before your next demo.
+> The runs talk to the real agents and can change ticket data. Run `python scripts/reset_demo.py` before your next demo.
 
 ## The suites
 
