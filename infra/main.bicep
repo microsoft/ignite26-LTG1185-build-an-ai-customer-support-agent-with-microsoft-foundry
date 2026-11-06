@@ -42,6 +42,11 @@ param embeddingModel object = {
   capacity: 100
 }
 
+@description('Tokens-per-minute capacity (in thousands) for each model. Raise them if runs are throttled and you have quota.')
+param chatModelCapacity string = '100'
+param triageModelCapacity string = '50'
+param embeddingModelCapacity string = '100'
+
 @description('Always-ready instances for the ticket system. 1 avoids cold starts during demos; set 0 to pay only per use.')
 param functionAlwaysReady string = '1'
 
@@ -65,9 +70,9 @@ module resources 'resources.bicep' = {
     tags: tags
     principalId: principalId
     principalType: principalType
-    chatModel: chatModel
-    triageModel: triageModel
-    embeddingModel: embeddingModel
+    chatModel: union(chatModel, { capacity: int(chatModelCapacity) })
+    triageModel: union(triageModel, { capacity: int(triageModelCapacity) })
+    embeddingModel: union(embeddingModel, { capacity: int(embeddingModelCapacity) })
     functionAlwaysReady: int(functionAlwaysReady)
     supportEngineerName: supportEngineerName
   }

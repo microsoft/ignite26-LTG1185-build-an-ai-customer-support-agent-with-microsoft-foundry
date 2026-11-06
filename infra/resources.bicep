@@ -169,6 +169,20 @@ resource search 'Microsoft.Search/searchServices@2025-05-01' = {
   }
 }
 
+// Lists the support-kb knowledge base on the portal's Knowledge page. Entra ID auth: no keys.
+resource searchConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01' = {
+  parent: project
+  name: 'support-search'
+  properties: {
+    category: 'CognitiveSearch'
+    target: 'https://${search.name}.search.windows.net/'
+    authType: 'AAD'
+    isSharedToAll: true
+    metadata: { ApiType: 'Azure', ResourceId: search.id, type: 'azure_ai_search', displayName: search.name }
+  }
+  dependsOn: [appInsightsConnection]
+}
+
 // ---------- Storage: tickets (tables), KB articles (blob), function packages (blob) ----------
 
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
@@ -286,9 +300,10 @@ resource projectToSearch 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
   properties: { principalId: project.identity.principalId, principalType: 'ServicePrincipal', roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.searchIndexDataReader) }
 }
 
+// Account scope: customer memory calls the chat and embedding deployments, which live on the account.
 resource projectToFoundry 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: project
-  name: guid(project.id, 'project-mi', roles.foundryUser)
+  scope: account
+  name: guid(account.id, 'project-mi', roles.foundryUser)
   properties: { principalId: project.identity.principalId, principalType: 'ServicePrincipal', roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.foundryUser) }
 }
 

@@ -8,6 +8,9 @@
     "principalId": { "value": "${AZURE_PRINCIPAL_ID}" },
     "principalType": { "value": "${AZURE_PRINCIPAL_TYPE=User}" },
     "functionAlwaysReady": { "value": "${FUNCTION_ALWAYS_READY=1}" },
+    "chatModelCapacity": { "value": "${CHAT_MODEL_CAPACITY=100}" },
+    "triageModelCapacity": { "value": "${TRIAGE_MODEL_CAPACITY=50}" },
+    "embeddingModelCapacity": { "value": "${EMBEDDING_MODEL_CAPACITY=100}" },
     "supportEngineerName": { "value": "${SUPPORT_ENGINEER_NAME=Alex Rivera}" }
   }
 }
