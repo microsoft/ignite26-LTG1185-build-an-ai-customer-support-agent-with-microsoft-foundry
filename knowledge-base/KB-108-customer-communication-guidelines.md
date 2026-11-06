@@ -3,7 +3,7 @@
 **Applies to:** All customer-facing updates | **Category:** Support policy | **Last reviewed:** October 2026
 
 ## Rules
-1. **A human approves every customer-facing message** before it's sent. AI assistants may draft messages, but never send them on their own.
+1. **A human approves every customer-facing message** before it's sent. Drafts are reviewed by a support engineer and are never sent automatically.
 2. **Internal notes stay internal.** Never paste log lines with internal hostnames, other tenants' data, or internal speculation into a customer message.
 3. **Lead with what matters to the customer:** impact, fix, and ETA.
 4. **Cite the fix**, for example "per our article KB-104", so the customer can check it.
