@@ -39,7 +39,7 @@
   .layout { display:grid; grid-template-columns:400px 1fr; height:calc(100vh - 72px); }
   .layout.collapsed { grid-template-columns:1fr; }
   .layout.collapsed .list { display:none; }
-  .list { background:#fff; border-right:1px solid var(--line); overflow:auto; }
+  .list { background:#fff; border-right:1px solid var(--line); overflow:auto; overflow-anchor:none; }
   .list h2 { font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:18px 20px 8px; }
   .row { padding:14px 20px; border-bottom:1px solid var(--line); cursor:pointer; }
   .row:hover { background:#f3f7fc; }
@@ -63,7 +63,7 @@
   .spin { width:16px; height:16px; border:3px solid currentColor; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite; display:inline-block; }
   @keyframes spin { to { transform:rotate(360deg); } }
 
-  .detail { overflow:auto; padding:28px 40px 60px; }
+  .detail { overflow:auto; overflow-anchor:none; padding:28px 40px 60px; }
   .wrap { max-width:1360px; margin:0 auto; }
   .empty { color:var(--muted); margin-top:140px; text-align:center; font-size:24px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:24px 30px; margin-bottom:20px; }
@@ -261,7 +261,7 @@ async function loadList() {
     engineer = data.engineer;
     document.getElementById("who").textContent = `${engineer}, Support Engineer`;
   }
-  document.getElementById("list").innerHTML = data.tickets.map((t) => `
+  setHtml(document.getElementById("list"), data.tickets.map((t) => `
     <div class="row ${t.ticket_id === selected ? "sel" : ""}" onclick="select('${esc(t.ticket_id)}')">
       <div class="top"><span><b>${esc(t.ticket_id)}</b> &middot; ${esc(t.customer)}</span><span>${esc(t.tier)}</span></div>
       <div class="title">${esc(t.title)}</div>
@@ -269,7 +269,18 @@ async function loadList() {
         ${t.agent_working ? '<span class="chip c-working"><span class="spin"></span>Agents working</span>' : ""}
         ${t.run_failed ? '<span class="chip c-failed">Run didn\'t finish</span>' : ""}
         ${t.awaiting_approval ? '<span class="chip c-approval">Needs approval</span>' : ""}</div>
-    </div>`).join("");
+    </div>`).join(""));
+}
+
+// The page polls every 3 seconds. Only rebuild when something changed, and keep the scroll position
+// so the page never moves on its own.
+function setHtml(el, html) {
+  if (el._html === html) return;
+  const scroller = el.closest(".detail, .list") || el;
+  const top = scroller.scrollTop;
+  el.innerHTML = html;
+  el._html = html;
+  scroller.scrollTop = top;
 }
 
 // Read the agents' progress from the ticket's notes, starting at the latest "New ticket" hand-off.
@@ -339,7 +350,7 @@ async function loadDetail() {
   let t;
   try { t = await call(`/tickets/${encodeURIComponent(selected)}`); }
   catch (e) {
-    if (/not found/i.test(e.message)) { selected = null; document.getElementById("detail").innerHTML = '<div class="empty">Select a ticket</div>'; return; }
+    if (/not found/i.test(e.message)) { selected = null; setHtml(document.getElementById("detail"), '<div class="empty">Select a ticket</div>'); return; }
     throw e;
   }
   const c = t.customer || {};
@@ -363,7 +374,8 @@ async function loadDetail() {
   const draftText = engineer ? (t.draft || "").replaceAll("[Engineer name]", engineer) : t.draft;
   currentDraft = draftText || "";
 
-  document.getElementById("detail").innerHTML = `<div class="wrap">
+  // Top to bottom in workflow order: the ticket, progress, what the agents found, then the email.
+  setHtml(document.getElementById("detail"), `<div class="wrap">
     <div class="card tk">
       <div class="crumb"><b>${esc(t.ticket_id)}</b> &middot; ${esc(c.name)} &middot; ${esc(c.tier)} support</div>
       <h1><span>${esc(t.title)}</span>
@@ -379,6 +391,11 @@ async function loadDetail() {
     ${t.run_failed ? `<div class="card failed"><div><h2>The agents' last run didn't finish</h2>
       <div class="text">${esc(t.run_error || "")}</div></div>
       <button class="primary" onclick="retry('${esc(t.ticket_id)}')">Retry</button></div>` : ""}
+    ${reports.length ? `<h3 class="sec">What the agents found</h3>` : ""}
+    ${reports.map((r) => `<div class="card report k-${esc(r.title).replace(/ /g, "-")}">
+      <div class="who"><b>${esc(r.title)}</b><span>${esc(r.author)} &middot; ${offset(r)}</span></div>
+      <div class="text">${md(r.body)}</div></div>`).join("")}
+    ${escalation ? `<div class="card esc"><h2>Escalated to an engineer</h2><div class="text">${md(escalation.text.replace(/^\[Escalation\]\s*/, ""))}</div></div>` : ""}
     ${p && p.revising ? `<div class="card revising">
       <h2><span class="spin"></span>Revising the email with your guidance</h2>
       <div class="text">&ldquo;${esc(p.guidance)}&rdquo;</div></div>` : ""}
@@ -395,14 +412,9 @@ async function loadDetail() {
     </div>` : ""}
     ${updates.slice().reverse().map((n) => `<div class="card sent"><h2>&#10003; Email sent to ${esc(c.contact_name)}</h2>
       <div class="w">Approved by ${esc(n.author)} &middot; ${when(n.created_at)}</div><div class="text" style="margin-top:12px">${md(n.text)}</div></div>`).join("")}
-    ${escalation ? `<div class="card esc"><h2>Escalated to an engineer</h2><div class="text">${md(escalation.text.replace(/^\[Escalation\]\s*/, ""))}</div></div>` : ""}
-    ${reports.length ? `<h3 class="sec">What the agents found</h3>` : ""}
-    ${reports.map((r) => `<div class="card report k-${esc(r.title).replace(/ /g, "-")}">
-      <div class="who"><b>${esc(r.title)}</b><span>${esc(r.author)} &middot; ${offset(r)}</span></div>
-      <div class="text">${md(r.body)}</div></div>`).join("")}
     ${other.length ? `<h3 class="sec"><button class="more" onclick="toggleDetails()">${details ? "Hide" : "Show"} technical activity (${other.length})</button></h3>` : ""}
     ${details ? `<div class="card">${other.slice().reverse().map(noteHtml).join("")}</div>` : ""}
-  </div>`;
+  </div>`);
 }
 
 function tick() {
@@ -447,6 +459,7 @@ function startEdit(id, mode) {
   const card = document.querySelector(".card.approval");
   if (!card) return;
   editing = { id, mode };
+  document.getElementById("detail")._html = null;  // the edit box changes the DOM; rebuild on Cancel
   const isEdit = mode === "edit";
   card.querySelector(".body").outerHTML = `<textarea id="editBox" rows="${isEdit ? 14 : 4}"
     placeholder="${isEdit ? "" : "Tell the agents what to change. For example: Also tell her the 4.2.1 upgrade fixes this for good."}"></textarea>`;
