@@ -144,7 +144,7 @@ See [docs/evaluations.md](docs/evaluations.md) for what each evaluator checks an
 
 ### Make it yours
 
-- **Connect your own ticket system.** The agents only see MCP tools, so replacing the mock is about exposing the same eight tools from ServiceNow, Zendesk, Dynamics 365, or your own system. See [docs/bring-your-own-ticket-system.md](docs/bring-your-own-ticket-system.md).
+- **Connect your own ticket system.** The agents only see MCP tools, so replacing the mock is mostly about exposing the same eight tools from ServiceNow, Zendesk, Dynamics 365, or your own system. Then you load your knowledge, fit the prompts to your product, and match your ID formats. See the checklist in [docs/bring-your-own-ticket-system.md](docs/bring-your-own-ticket-system.md).
 - **Use your own knowledge base.** Replace the files in [knowledge-base/](knowledge-base/) and run `azd deploy` again; the setup script re-indexes them.
 - **Change how an agent behaves.** Edit its `instructions.md` under [agents/](agents/) and run `azd deploy`, or edit it in the portal and publish a new version. Then run the evals to compare versions.
 - **Do it by hand.** [instructions/portal-walkthrough.md](instructions/portal-walkthrough.md) builds the same system click by click in the Foundry portal, which is the best way to learn what each piece does.

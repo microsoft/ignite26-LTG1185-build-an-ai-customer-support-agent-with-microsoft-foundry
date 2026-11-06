@@ -34,6 +34,11 @@ class SignatureTests(unittest.TestCase):
 
 
 class DecisionPatternTests(unittest.TestCase):
+    def test_only_a_queue_request_picks_a_ticket_on_its_own(self):
+        self.assertTrue(main.QUEUE_PICKUP.search("Process the oldest New ticket"))
+        message = "New ticket INC0012345"
+        self.assertFalse(main.TICKET_ID.search(message) or main.QUEUE_PICKUP.search(message))
+
     def test_approve_variants(self):
         for text in ("approve", "Approved", "send it", "yes, go ahead"):
             self.assertTrue(main.APPROVE.match(text), text)

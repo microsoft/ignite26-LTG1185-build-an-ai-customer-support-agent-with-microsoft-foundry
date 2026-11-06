@@ -40,7 +40,10 @@ logger = logging.getLogger("case-manager")
 PROJECT_ENDPOINT = os.environ["FOUNDRY_PROJECT_ENDPOINT"]
 TOOLBOX_ENDPOINT = os.environ["TOOLBOX_ENDPOINT"]
 KB_BASE_URL = os.environ.get("KB_BASE_URL", "").rstrip("/")
+# Your system's ticket ID format. Change this to match yours, for example r"\bINC\d{7}\b" for ServiceNow.
 TICKET_ID = re.compile(r"\bTCK-\d+\b", re.IGNORECASE)
+# Only a message that asks for the queue picks a ticket on its own; any other message must name a ticket.
+QUEUE_PICKUP = re.compile(r"\boldest\b", re.IGNORECASE)
 APPROVE = re.compile(r"^\s*(approve|approved|yes|send it|send)\b", re.IGNORECASE)
 DENY = re.compile(r"^\s*(deny|denied|reject|no|don't send|do not send)\b", re.IGNORECASE)
 REVISE = re.compile(r"^\s*(revise|request changes)\b", re.IGNORECASE)
@@ -71,8 +74,8 @@ LIST_TOOL = "ticket-system___list_open_tickets"
 LAST_TICKET = "last_ticket_id"
 CITATION_MARK = re.compile(r"\u3010[^\u3011]*\u3011")  # 【7:0†source】
 SANDBOX_LINK = re.compile(r"!?\[([^\]]*)\]\((?!https?://)[^)]*\)")  # sandbox:/mnt/data/x.png, /mnt/data/x.png, x.png
-KB_ID = re.compile(r"KB-\d+", re.IGNORECASE)
-CUSTOMER_KBS = {"KB-109"}  # written for customers, so they may appear in the email body
+KB_ID = re.compile(r"KB-\d+", re.IGNORECASE)  # your knowledge article ID format
+CUSTOMER_KBS = {"KB-109"}  # written for customers, so they may appear in the email body; list your own
 IMAGE_EXT = (".png", ".jpg", ".jpeg")
 
 credential = DefaultAzureCredential()
@@ -509,8 +512,15 @@ class Intake(Executor):
             await ctx.send_message(decision_msg(ticket_id, bool(APPROVE.search(text)), approver(text), run))
             return
 
+        if not found and not QUEUE_PICKUP.search(text):
+            await ctx.yield_output(
+                "I couldn't find a ticket ID in that message, so I didn't start a run. "
+                "Name the ticket, for example: New ticket TCK-1042. "
+                "If your ticket IDs look different, update TICKET_ID in main.py."
+            )
+            return
         if not found:
-            # No ticket named (for example a routine's "Process the oldest New ticket"): take the queue's oldest.
+            # A queue pickup with no ticket named (the routine's "Process the oldest New ticket"): take the queue's oldest.
             listing = parse_json(await call_toolbox(LIST_TOOL, {"status": "New"}))
             if listing.get("error"):
                 await ctx.yield_output(listing["error"])

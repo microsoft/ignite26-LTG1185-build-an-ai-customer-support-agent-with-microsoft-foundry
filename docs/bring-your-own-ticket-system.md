@@ -1,6 +1,29 @@
 # Connect your own ticket system
 
-The sample's ticket system is a small Azure Function, but the agents never see it directly. They see eight **MCP tools**. Put the same eight tools in front of ServiceNow, Zendesk, Dynamics 365 Customer Service, Jira Service Management, or your own system, and the agents work without changes.
+The sample's ticket system is a small Azure Function, but the agents never see it directly. They see eight **MCP tools**. Put the same eight tools in front of ServiceNow, Zendesk, Dynamics 365 Customer Service, Jira Service Management, or your own system, and the workflow stays the same: diagnose, draft, a person approves.
+
+## What you change, and what stays
+
+**What stays:**
+- the Case Manager workflow and its routing in code
+- the approval gate
+- the five agents' jobs
+- the tool contract below
+
+**What you change:**
+
+| # | Change | Where | Details |
+|---|---|---|---|
+| 1 | **Start runs from your system.** Give it an Entra identity (managed identity or service principal) with the **Foundry User** role on the project. Have a business rule, trigger, or flow dispatch the `case-intake` routine. | Your ticket system | [Start a run from your system](#start-a-run-from-your-system) |
+| 2 | **Swap the connector.** Expose your system as the eight MCP tools and connect them as `ticket-system`. | Your MCP server, `scripts/setup.py`, `agents/*/agent.json` | [The contract](#the-contract), [Connect it to Foundry](#connect-it-to-foundry) |
+| 3 | **Load your knowledge into Foundry IQ.** | `knowledge-base/` | Replace the files in `knowledge-base/` with your KB articles, runbooks, and resolved cases, then rerun `python scripts/setup.py`. It uploads them to the `kb-articles` container behind the `support-kb` knowledge base. You can also add your own source, such as SharePoint, to `support-kb` in the Foundry portal. |
+| 4 | **Fit the prompts to your product.** | `agents/*/instructions.md` | The instructions name the sample's product (Contoso OrderSync) and three articles: KB-107 (severity definitions), KB-108 (communication guidelines), and KB-109 (log collection guide for customers). Replace the product name, point to your own equivalents of those three articles, then rerun `python scripts/setup.py` to publish new agent versions. The steps, rules, and output formats stay the same. |
+| 5 | **Match your ID formats.** | Top of `src/case-manager/main.py` | Set `TICKET_ID` to your ticket ID format (for example `r"\bINC\d{7}\b"` for ServiceNow), `KB_ID` to your article ID format, and `CUSTOMER_KBS` to the articles customers may see. A message without a recognizable ticket ID is refused, not guessed. |
+| 6 | **Feed customer memory.** | Your ticket system or CRM | Agents only read the `customer-memory` store. In the sample, the ticket system seeds a profile for each customer and adds case history when a ticket resolves (`_record_case_history` in `function_app.py`). Do the same from your system, with one scope per customer ID. |
+| 7 | **Point the log tools at your logs.** | Your MCP server | `get_logs` and `get_log_stats` can query Application Insights, Splunk, or Datadog for the ticket's customer and time window. |
+| 8 | **Put approval where your engineers work.** | Your ticket system | An **Approve** button dispatches `approve <ticket id> by <engineer>`. The sample's console is only a stand-in. |
+
+Start with 1 to 3 on a single ticket type, then add the rest.
 
 ## The contract
 
